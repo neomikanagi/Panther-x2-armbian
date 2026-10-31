@@ -1,5 +1,14 @@
 # 多 AI 交接
 
+## 2026-11-01 — pi（gpt-6.1-sol）→ 授权 B 诊断启动检查点
+
+- **状态：** 用户已明确回复「b！最好能一次性为我做出杂交固件」，授权一次可能失联、需线刷恢复的诊断启动。已完成备份、源码/载荷校验和文件暂存；写本条时仍是正常 6.18.57，尚未执行本轮重启。36 项单测、相关 ShellCheck 通过。
+- **方案：** 不再复用失败的 6.1.115 rootfs，也不混用主线 DTB。保留当前可启动 ophub 用户空间与原有 Image/uInitrd/DTB，采用固定 SHA-256 的 ophub `kernel_rk35xx/6.1.174.tar.gz` 整套内核、模块、DTB、initrd；基于同包 Panther DTB 按符号启用 NPU/MPP/RGA/MMU，并解析同包 vdd_npu/vdd_logic phandle，不动 DDR 电压/时序。GPU/display 禁用，定位为 headless NPU/VPU 工位。
+- **启动与恢复：** 内核显式加载到 2MiB 对齐的 32MiB，环境暂存 128MiB，DTB/ramdisk 161/162MiB，离线检查区域不重叠。`select_hybrid_boot.sh --trial` 只选启动项、绝不自行重启。试启动 init-premount 会先把 boot.scr 恢复为保留的主线脚本，再继续这次 BSP 启动；若后续 panic 则可重启回主线。挂在更早阶段仍可能失联，不能承诺自动恢复。只安排本轮授权的一次诊断启动，不盲目循环重启。
+- **备份：** 目标 `/root/panther-hybrid-backup-20261031T180303Z/` 有干净只读 /boot 分区镜像、原始 boot 文件归档、eMMC 前 16MiB、分区表与显式恢复脚本；已复制到本地 `artifacts/hybrid-20261101/recovery/` 和 MBA 的 `Downloads/Panther-X2-Hybrid-Recovery-20261101/` 并核对 SHA。这些是私有恢复材料，不是可从地址 0 刷入的整盘镜像，绝不发布 GitHub。
+- **取证：** 私有 `hybrid-debug.env` 仅本次试启动使用；MBA 临时 UDP netconsole 接收器已做路径测试，再重启为空白监听，避免 BSD nc 绑定到预检随机源端口。地址/MAC/密码不进源码或公共载荷。目标 `/boot/hybrid/` 是匹配载荷，模块目录已加入；原始启动选择在检查点尚未改变。
+- **下一步：** 激活试启动、核对原启动文件及载荷哈希后执行唯一一次诊断重启；若能 SSH 返回，运行 `/opt/panther-hybrid/` 的真实 RKNN 推理以及 MPP H.264 解码/编码，不能用设备节点代替验收。成功后写硬件验收报告并 promote，再以干净的原始 ophub 发布镜像合成可刷 eMMC 的通用固件，不能克隆实机私有数据。若失败，保留 netconsole 和试启动标记，恢复正常系统，不把候选叫修复成功。
+
 ## 2026-11-01 — pi（gpt-6.1-sol）→ 等待诊断启动条件
 
 - **状态：** 用户反馈 eMMC 线刷仍不启动，已恢复 ophub `6.18.57` 供检查；启动问题未修复。本轮 SSH 只读检查，未装目标机软件、未改引导或内核、未重启；结束时启动文件哈希与取证开始相同。不要把前条离线生成通过当成实机成功，也不要再把 TF 卡当作唯一排查方式。

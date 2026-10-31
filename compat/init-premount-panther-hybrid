@@ -1,0 +1,55 @@
+#!/bin/sh
+# Generic initramfs helper. Private receiver/trial options come ONLY from cmdline.
+PREREQ=""
+if [ "${1:-}" = prereqs ]; then echo "$PREREQ"; exit 0; fi
+trial=0
+receiver=
+bootpart=
+for arg in $(cat /proc/cmdline); do
+    case "$arg" in
+        hybrid_trial=1) trial=1 ;;
+        hybrid_netconsole=*) receiver=${arg#hybrid_netconsole=} ;;
+        ubootpart=*) bootpart=${arg#ubootpart=} ;;
+    esac
+done
+log() { printf '<6>panther-hybrid: %s\n' "$*" > /dev/kmsg; }
+if [ -n "$receiver" ]; then
+    # Same-kernel module; no dependencies, no new IP address or route configured.
+    if insmod /usr/lib/modules/@KERNEL_VERSION@/kernel/drivers/net/netconsole.ko "netconsole=$receiver"; then
+        log 'network diagnostic console registered'
+    else
+        log 'network diagnostic console unavailable; continuing boot'
+    fi
+fi
+[ "$trial" = 1 ] || exit 0
+# Restore the normal boot script BEFORE mounting root. If later boot fails, the
+# next reset can use mainline. This cannot protect a hang before this script runs.
+case "$bootpart" in ''|*[!a-fA-F0-9-]*) log 'invalid boot PARTUUID; rollback not armed'; exit 0 ;; esac
+count=0
+while [ ! -e "/dev/disk/by-partuuid/$bootpart" ] && [ "$count" -lt 15 ]; do
+    sleep 1
+    count=$((count + 1))
+done
+mkdir -p /run/panther-hybrid-boot
+if mount -t ext4 -o rw "/dev/disk/by-partuuid/$bootpart" /run/panther-hybrid-boot; then
+    base=/run/panther-hybrid-boot
+    if [ -s "$base/hybrid/boot.mainline.scr" ]; then
+        if cp "$base/hybrid/boot.mainline.scr" "$base/boot.scr.trial-rollback" && \
+           mv "$base/boot.scr.trial-rollback" "$base/boot.scr"; then
+            uname -r > "$base/hybrid/trial-kernel.txt"
+            printf '%s\n' 'normal boot script restored by trial initramfs' > "$base/hybrid/trial-status.txt"
+            sync
+            # A panic after rollback is armed may reboot into the normal kernel.
+            printf '%s\n' 30 > /proc/sys/kernel/panic
+            log 'normal next-boot script restored; trial kernel continues this boot'
+        else
+            log 'boot-script restoration failed; rollback not armed'
+        fi
+    else
+        log 'normal boot-script backup missing; rollback not armed'
+    fi
+    umount /run/panther-hybrid-boot || log 'temporary boot mount could not be unmounted'
+else
+    log 'cannot mount boot partition; rollback not armed'
+fi
+exit 0

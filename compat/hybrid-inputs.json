@@ -1,0 +1,20 @@
+{
+  "profile": "panther-x2-headless-npu-vpu",
+  "kernel_version": "6.1.174-rk35xx-ophub",
+  "kernel_package": {
+    "url": "https://github.com/ophub/kernel/releases/download/kernel_rk35xx/6.1.174.tar.gz",
+    "sha256": "6f126491b647a599cdc7ac22ef05a3b99effeb7de546c46624c0921accc3e785",
+    "size": 135242846
+  },
+  "base_image": {
+    "url": "https://github.com/ophub/amlogic-s9xxx-armbian/releases/download/Armbian_trixie_arm64_server_2026.10/Armbian_26.11.0_rockchip_panther-x2_trixie_6.18.57_server_2026.10.17.img.gz",
+    "sha256": "4d4f4caf9362107d43415c47a05e28907c187c96102041c0eac8f07598581926"
+  },
+  "enable_symbols": ["rknpu", "rknpu_mmu", "mpp_srv", "rk_rga", "rkvdec", "rkvdec_mmu", "rkvenc", "rkvenc_mmu", "vdpu", "vdpu_mmu", "vepu", "vepu_mmu", "jpegd", "jpegd_mmu", "iep", "iep_mmu"],
+  "disable_symbols": ["gpu", "display_subsystem"],
+  "kernel_load": 33554432,
+  "env_load": 134217728,
+  "fdt_load": 168820736,
+  "initrd_load": 169869312,
+  "notes": "Use the matching Panther X2 DTB, initrd and modules from this exact package; enable NPU/MPP/RGA and their IOMMUs by symbols, resolve NPU supply phandle from the same DTB. No DDR voltage/timing changes. GPU/display intentionally disabled for headless use. Private trial/receiver configuration is never part of public payloads."
+}
