@@ -119,6 +119,15 @@ class GraftTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             g.graft(Path("/dev/null"), self.out, self.loaders, self.manifest)
 
+    def test_refuses_nonempty_vendor_storage(self):
+        for offset in (g.VENDOR_START, g.VENDOR_START + 65536, g.VENDOR_END - 1):
+            with self.subTest(offset=offset):
+                image(self.source)
+                with self.source.open("r+b") as f:
+                    f.seek(offset)
+                    f.write(b"X")
+                self.refused()
+
     def test_refuses_altered_loader(self):
         path = self.loaders / "idbloader.img"
         path.write_bytes(b"x" * path.stat().st_size)

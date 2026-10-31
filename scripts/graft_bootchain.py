@@ -16,6 +16,9 @@ import zlib
 SECTOR = 512
 GAP_START = 64 * SECTOR
 GAP_END = 32768 * SECTOR
+# Rockchip sdmmc_vendor_storage.c: four 64 KiB slots at sector 7168.
+VENDOR_START = 7168 * SECTOR
+VENDOR_END = 7680 * SECTOR
 CHUNK = 8 * 1024 * 1024
 DEFAULT_MANIFEST = Path(__file__).resolve().parents[1] / "compat/inputs.json"
 
@@ -131,6 +134,10 @@ def graft(image: Path, output: Path, loader_dir: Path, manifest_path: Path = DEF
         raise ValueError("Output exists; refusing to overwrite")
     manifest = json.loads(manifest_path.read_text())
     partitions = partition_layout(image)
+    with image.open("rb") as source:
+        source.seek(VENDOR_START)
+        if any(source.read(VENDOR_END - VENDOR_START)):
+            raise ValueError("Nonempty Rockchip vendor-storage region: refusing to erase device metadata; use generic release images only")
     gap = make_gap(manifest, loader_dir)
     before = digest(image, outside_gap=True)
     created = False
@@ -163,6 +170,7 @@ def graft(image: Path, output: Path, loader_dir: Path, manifest_path: Path = DEF
             "boot_gap_sha256": manifest["boot_gap"]["sha256"],
             "protected_bytes_sha256": after,
             "protected_bytes_unchanged": True,
+            "source_vendor_storage_empty": True,
             "partitions": partitions,
             "bootloader_commit": manifest["bootloader_commit"],
             "loaders": [{k: p[k] for k in ("name", "offset", "size", "sha256")} for p in manifest["loaders"]],
