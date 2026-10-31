@@ -1,5 +1,13 @@
 # 多 AI 交接
 
+## 2026-11-01 — pi（gpt-6.1-sol）→ 等待实物断电再通电
+
+- **状态：pending。** 已执行用户授权 B 的一次诊断重启；重启后原 IP 的 SSH 和两端 ping 均无回复。MBA 的 UDP 接收器预检通过、重启前已清空连接状态，事后仍在监听，但 netconsole 为 0 字节；mDNS 的 armbian.local/panther-x2.local 亦未解析。不能据此断定内核停在 initramfs 之前，也没有排除网络未起来或地址变化，不能宣称修复/确诊 RAM 批次。
+- **已做：** `d3ff2da` 提交了固定 SHA 的 6.1.174 匹配载荷、headless DTB 修正、initrd 试启动回退与受控启动选择工具；36 项离线单测、Bash 脚本 ShellCheck 通过。原 Image/uInitrd/DTB 哈希在激活前通过；boot.scr 已改为已校验的 hybrid 脚本后才重启。新模块和本机 RKNN/MPP 测试程序已暂存，但因未能回连，**没有运行 NPU/VPU 硬件验收，也没有合成/发布新整盘固件。**
+- **为什么停：** 失败现场没有串口日志，网络日志也没到达；继续换内核/DTB盲试会丢失当前现场，且本轮只安排一次风险启动。已向用户请求先断电再通电一次、先不要重刷，并用 Signal AGENT `--force` 喊人。若 init-premount 曾运行，下一次应尝试保留的主线 boot.scr；若更早挂住，回退可能未生效。
+- **请你：** 等用户确认重新通电，再只读检查连通性、uname、`/boot/hybrid/trial-status.txt`、`trial-kernel.txt`、boot.scr 校验值、journal/pstore。读私有 `artifacts/hybrid-20261101/` 中的 reboot-trial、post-trial、receiver 和备份记录接续；地址/凭据不写公开文档。仍不能恢复时再协调原可启动镜像线刷或 3.3V UART，不要求 TF 卡，不自动安排第二次可能失联的启动。
+- **恢复材料：** 目标 `/root/panther-hybrid-backup-20261031T180303Z/`；服务器 `artifacts/hybrid-20261101/recovery/`；MBA `Downloads/Panther-X2-Hybrid-Recovery-20261101/`。MBA 的 boot 分区镜像和 eMMC 前缀 SHA 已核对；`README.md` 明确这是分区备份，禁止当整盘从地址 0 乱刷。保留原引导程序、正常系统组件和 private vendor-storage；不要撤销这些保护或把实机快照发 GitHub。
+
 ## 2026-11-01 — pi（gpt-6.1-sol）→ 授权 B 诊断启动检查点
 
 - **状态：** 用户已明确回复「b！最好能一次性为我做出杂交固件」，授权一次可能失联、需线刷恢复的诊断启动。已完成备份、源码/载荷校验和文件暂存；写本条时仍是正常 6.18.57，尚未执行本轮重启。36 项单测、相关 ShellCheck 通过。
