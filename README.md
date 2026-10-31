@@ -1,73 +1,68 @@
-# Panther X2 NPU/VPU Armbian
+# Panther X2：BSP NPU/VPU + 已知能启动的 ophub 引导链
 
-- 😺 本项目基于[clfang666/Panther-x2-NPU-VPU](https://github.com/clfang666/Panther-x2-NPU-VPU)项目修改
-- 👍 让Panther X2可以驱动NPU/VPU/GPU，同时蓝牙（仅BLE）USB 功能完好
-- 😋 运行NPU测试需要在python3.11下运行
-```bash
-cd examples
-# python3.13 没有 rknn-toolkit-lite2 包，已知3.11可以，3.12 不清楚
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv uv python install 3.11
-uv venv --python 3.11
-# 激活虚拟环境
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-# !!! 需要此文件才可以正常驱动 !!!
-sudo mv librknnrt.so /usr/lib
-./detect-once.py 1.jpg
+这是 **待实机验证的兼容候选**：保留 wlxxyw Debian 13 / Rockchip BSP 6.1.115 的内核、设备树、模块与系统分区，只把分区前的引导区换成 ophub 的 Panther X2 专用版本。**还没有证明能启动，也没有证明故障来自内存批次。**
+
+## 下载与试机
+
+优先下载本 fork 的 `bootchain-candidate-*` **预发布**，或 Actions 中的 `Panther-X2-BSP61-ophub-bootchain-candidate` artifact：
+
+- `Armbian_Panther-X2_trixie_BSP6.1.115_ophub-bootchain_candidate.img.xz`
+- 同名 `.sha256`
+- `bootchain-validation.json`：改动范围、完整镜像校验值、分区保持不变的证据。
+- `inputs.json`：下载地址、固定提交、输入校验值。
+
+1. 校验下载文件后，用 Etcher 等将 `.img.xz` 写入**空闲 TF 卡**。不要覆盖 eMMC，也不要把外接备份盘当成 TF 卡。
+2. 断电插卡再开机，检查路由器 DHCP 与 SSH，而不只看灯。现有 eMMC 可能影响启动来源；没有确认来源前，不能把“有/无 IP”当成候选镜像成功/失败的充分证据。
+3. 能登录后先核对 `uname -r` 为 `6.1.115-vendor-rk35xx`、根分区来自 TF，再检查 `/dev/rknpu`、`/dev/mpp_service`、`/dev/rga` 与内核日志。最终须跑 RKNN 推理和 MPP 硬件编解码，不能只看驱动节点。
+4. 失败时保留现象和上电串口日志；拔卡回到原系统。**TF 启动本身不完全隔离 eMMC 引导链，勿为此擦除 eMMC。**
+
+本候选仍保留原 rootfs 中的 Rock-3C U-Boot 软件包及配置；实机验证前不要重装/升级 U-Boot、执行写入 eMMC 的安装器，否则可能把兼容引导覆盖回去。复用现成系统的账号初始化方式；本项目不增加默认密码或远程登录密钥。
+
+## 为什么先改引导
+
+失败基线使用 `rock-3c-rk3566_defconfig`，成功基线使用 ophub 的 Panther X2 专用引导文件。两者仍可能在内核设备树、DMC、供电或初始化方面存在其他差异，因此第一步只控制一个变量：
+
+```text
+ophub Panther X2 idbloader（DDR 初始化/SPL）+ u-boot.itb（U-Boot/固件）
+  → 原样保留的 BSP 6.1.115 内核 + Panther X2 DTB + 模块 + Debian 13
 ```
 
-GitHub Actions 会获取固定版本的 Armbian 构建框架，生成 Debian 13 Trixie 镜像，并校验
-Rockchip BSP 6.1 的 VPU、NPU、RGA 和 IEP 驱动配置。
+固定输入见 [`compat/inputs.json`](compat/inputs.json)：
 
-镜像构建在最终 `apt update` 前删除错误的 `/etc/apt/sources.list.d/armbian.list`
-和 `/etc/apt/sources.list.d/armbian.sources`，并在后期再次清理。成品校验会确认这两个
-文件均不存在，避免上传仍含错误 Armbian 软件源的镜像。
+- 失败基线：wlxxyw `pantherx2-trixie-13`，SHA-256 `2703abaf…c8d08278`。
+- 用户报告能启动的参照：ophub `6.18.57_server_2026.10.17`。参照镜像本身不进入构建。
+- 引导文件：`ophub/u-boot` 提交 `ce8e3d9d6c70a74a17d9b01cf80b44c6ec08f146`。
 
-## 固定构建输入
+检查范围是 `[32768, 16777216)` 字节，即 LBA 64 到第一分区之前：清除原引导与陈旧环境，写入固定的 `idbloader.img`（LBA 64）及 `u-boot.itb`（LBA 16384）。生成区间的 SHA-256 与成功参照的完整引导空隙一致。主/备 GPT、MBR、FAT 启动分区和根分区逐字节不变；不会混用另一内核的 DTB 或模块。
 
-- Armbian build：`70a242faa308c57be5ed636897dfee77de350773`
-- 系统：Debian 13 Trixie
-- 板卡：`panther-x2-vendor`
-- 内核：Rockchip vendor BSP 6.1
-- 内核源码提交：`5280f9b4336199c4025c8eed894d2b4e2268dcc6`
-- 预期内核版本：`6.1.115-vendor-rk35xx`
-- U-Boot 源码提交：`c55987146f4f9b20f7cb2f917ca88300419afe8d`
-- U-Boot 来源：Radxa `stable-4.19-rock3`
+## GitHub Actions
 
-内核补丁加入 `rk3566-panther-x2.dts`，启用 BSP MPP、RGA、IEP、RKVDEC、
-RKVENC 和 RKNPU 节点，并加入实体板已经验证的 NPU 电源引用。U-Boot 补丁修复旧版
-Radxa 源码与较新 GCC 的两处兼容性问题。
+两个工作流都只手动触发，避免普通文档提交启动数小时编译：
 
-## 云端编译
+- **Panther X2 bootchain compatibility candidate**：下载校验固定基线与两份引导文件，快速重打包。`publish_release=true` 会发布明确标为候选的 prerelease。
+- **Build Panther X2 Trixie BSP 6.1**：保留上游完整源码编译；编译和 BSP 静态校验后，同样执行引导替换再压缩。这个全编译路径的修改尚未实际跑完，不能等同于快速重打包路径的验收。
 
-推送到 `main` 后，工作流
-`.github/workflows/build-pantherx2-trixie.yml` 会自动开始编译。也可以在 GitHub 的
-**Actions → Build Panther X2 Trixie BSP 6.1 → Run workflow** 中手动启动。
+构建器只接受普通镜像文件，拒绝设备、符号链接、已有输出、损坏 GPT、不符的分区偏移或引导校验值；不包含刷盘动作。测试使用合成 GPT 文件，不碰硬件：
 
-构建产物包括：
-- `6.1.115-vendor-rk35xx.tar.gz`：可用于armbian-update脚本使用的内核替换包，无需重做系统；
-- `*.img.xz`：压缩后的 Armbian 镜像；
-- `*.img.xz.sha256`：镜像 SHA-256；
-- `pantherx2-validation.txt`：镜像内容与 VPU/NPU DTB 校验报告。
+```bash
+python3 -m unittest discover -s tests -v
+bash scripts/build_bootchain_candidate.sh
+# 对新的源码编译产物应用相同引导：
+bash scripts/build_bootchain_candidate.sh --input /path/to/new.img --out ./candidate
+```
 
-工作流会分别挂载镜像的根分区和 FAT `/boot` 分区，然后检查 Debian 13、内核
-配置、启动 DTB、加速器节点状态及 NPU 电源引用。只有全部通过，镜像才会作为
-Actions Artifact 上传。
+自动化校验仅证明内容与改动边界，不代替上电测试。
 
-本仓库负责内核、U-Boot、设备树和系统镜像。Rockchip MPP/RGA/RKNN 用户态库及
-具体推理模型运行环境需要在系统启动后另行安装和验证。
+## NPU / VPU 用户态
 
-## 实机测试
+保留了上游 `examples/` 的 RKNN 示例、模型与运行库；它们尚未在目标机器上重新验收。RKNN Lite2 版本需与内核驱动、模型及 `librknnrt.so` 匹配；上游示例使用 Python 3.11。MPP/RGA 用户态与适配的 FFmpeg 仍需另行安装并实测，镜像能启动不代表加速已可用。
 
-- ![设备识别](https://s3.431900.xyz/default/OMNIBOOK7-XU/2026/08/mintty_4EhEvEqqHv.png)
-- ![rknn示例](https://s3.431900.xyz/default/OMNIBOOK7-XU/2026/08/mintty_YJdcO0JOlq.png)
+## 上游
 
-## 上游项目
-
+- [wlxxyw/Panther-x2-armbian](https://github.com/wlxxyw/Panther-x2-armbian)
 - [clfang666/Panther-x2-NPU-VPU](https://github.com/clfang666/Panther-x2-NPU-VPU)
-- [Armbian build](https://github.com/armbian/build)
-- [Armbian Rockchip kernel](https://github.com/armbian/linux-rockchip)
-- [Radxa U-Boot](https://github.com/radxa/u-boot)
+- [ophub/u-boot](https://github.com/ophub/u-boot)
+- [ophub/amlogic-s9xxx-armbian](https://github.com/ophub/amlogic-s9xxx-armbian)
+- [Armbian build](https://github.com/armbian/build)、[Rockchip kernel](https://github.com/armbian/linux-rockchip)、[Radxa U-Boot](https://github.com/radxa/u-boot)
 
-仓库中的上游补丁和衍生源码片段继续遵循各自上游项目的许可证。
+上游补丁、模型、固件及衍生源码继续遵循各自上游许可；本 fork 不重新声明上游资产的许可。

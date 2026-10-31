@@ -8,13 +8,6 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/build-pantherx2-trixie.yml
-      - armbian/**
-      - README.md
 
 concurrency:
   group: pantherx2-trixie-${{ github.ref }}
@@ -129,23 +122,13 @@ jobs:
             chmod +x "armbian/scripts/verify_and_package.sh"
             "armbian/scripts/verify_and_package.sh"
 
-      - name: Compress and checksum image
+      - name: Apply pinned Panther X2 bootchain, compress and checksum
         shell: bash
         run: |
           set -euo pipefail
-
-          cd /builder/build/output/images
-          image="$(find . -maxdepth 1 -type f -name '*.img' -print -quit)"
+          image="$(find /builder/build/output/images -maxdepth 1 -type f -name '*.img' -print -quit)"
           test -n "${image}"
-          compressed="${image}.xz"
-          temporary="${compressed}.tmp"
-
-          xz --threads=0 -3 --stdout "${image}" > "${temporary}"
-          mv -- "${temporary}" "${compressed}"
-          sha256sum "${compressed}" > "${compressed}.sha256"
-          sha256sum --check "${compressed}.sha256"
-          rm -- "${image}"
-          ls -lh .
+          bash scripts/build_bootchain_candidate.sh --input "${image}"
 
       - name: Upload verified firmware
         uses: actions/upload-artifact@v4
@@ -153,8 +136,7 @@ jobs:
           name: Panther-X2-Trixie-BSP61-${{ github.run_number }}
           path: |
             /builder/build/output/kernel/*.tar.gz
-            /builder/build/output/images/*.img.xz
-            /builder/build/output/images/*.img.xz.sha256
+            out/*
             pantherx2-validation.txt
           if-no-files-found: error
           compression-level: 0
@@ -172,7 +154,7 @@ jobs:
           retention-days: 14
 
       - name: Publish GitHub Release
-        if: success() && (github.event_name == 'push' || inputs.publish_release)
+        if: success() && inputs.publish_release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -182,10 +164,10 @@ jobs:
           tag="pantherx2-trixie-${GITHUB_RUN_NUMBER}"
           gh release create "${tag}" \
             /builder/build/output/kernel/*.tar.gz \
-            /builder/build/output/images/*.img.xz \
-            /builder/build/output/images/*.img.xz.sha256 \
+            out/* \
             "${GITHUB_WORKSPACE}/pantherx2-validation.txt" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
-            --title "Panther X2 Debian 13 BSP 6.1 build ${GITHUB_RUN_NUMBER}" \
-            --notes "Verified Panther X2 Trixie image built from Armbian ${ARMBIAN_COMMIT}."
+            --prerelease \
+            --title "Panther X2 BSP 6.1 source build + ophub bootchain CANDIDATE ${GITHUB_RUN_NUMBER}" \
+            --notes "Built from Armbian ${ARMBIAN_COMMIT}; offline-validated only. GPT and BSP filesystems preserved during pinned ophub bootchain graft. Hardware boot and NPU/VPU runtime NOT tested. Test on a spare TF card first."

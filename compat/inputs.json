@@ -1,0 +1,34 @@
+{
+  "base": {
+    "url": "https://github.com/wlxxyw/Panther-x2-armbian/releases/download/pantherx2-trixie-13/Armbian-unofficial_26.08.0-trunk_Panther-x2-vendor_trixie_vendor_6.1.115.img.xz",
+    "sha256": "2703abaff19c0883f8a24b5e5808cab714e0c6554b3de4d9867d5242c8d08278",
+    "size": 625037084
+  },
+  "bootloader_commit": "ce8e3d9d6c70a74a17d9b01cf80b44c6ec08f146",
+  "loaders": [
+    {
+      "name": "idbloader.img",
+      "url": "https://raw.githubusercontent.com/ophub/u-boot/ce8e3d9d6c70a74a17d9b01cf80b44c6ec08f146/u-boot/rockchip/panther-x2/idbloader.img",
+      "offset": 32768,
+      "size": 305152,
+      "sha256": "990afd3e1a96094a1b6ef0b32ea55cb9cb2d6de53bd7e368d6c77fea4eddd91e"
+    },
+    {
+      "name": "u-boot.itb",
+      "url": "https://raw.githubusercontent.com/ophub/u-boot/ce8e3d9d6c70a74a17d9b01cf80b44c6ec08f146/u-boot/rockchip/panther-x2/u-boot.itb",
+      "offset": 8388608,
+      "size": 1431552,
+      "sha256": "3a662accda44a1efcb7822972f701dc95ef07a81830f7679440de04d916ab0af"
+    }
+  ],
+  "boot_gap": {
+    "start": 32768,
+    "end": 16777216,
+    "sha256": "2d61b73387e90d97e4401b48e5efe886b3d46702072878033d5d18680fb88c1e"
+  },
+  "known_good_reference": {
+    "url": "https://github.com/ophub/amlogic-s9xxx-armbian/releases/download/Armbian_trixie_arm64_server_2026.10/Armbian_26.11.0_rockchip_panther-x2_trixie_6.18.57_server_2026.10.17.img.gz",
+    "release_sha256": "4d4f4caf9362107d43415c47a05e28907c187c96102041c0eac8f07598581926",
+    "evidence": "2026-10-31: downloaded the exact reference gzip and verified its complete release SHA-256; both loaders and the entire first-16-MiB zero-padded boot gap match these pinned upstream files. The reference image is not a build input. Boot success is user-reported, not independently retested."
+  }
+}
