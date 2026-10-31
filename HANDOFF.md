@@ -2,7 +2,7 @@
 
 ## 2026-10-31 — pi → 实机验证
 
-- **状态：** 兼容候选已完成本地与 GitHub Actions 两次独立离线生成，压缩镜像 SHA-256 完全一致（`a09748b7f544de5d62b3b56cc6f6cfbe9ed103126c1dced6a6a93f946ec2c529`，624997688 字节）。Actions `41206370109` 全部成功，已发布 `bootchain-candidate-1` prerelease。尚未上电验证；NPU/VPU 运行未验收。18 项合成 GPT 测试、ShellCheck、YAML 解析通过。完整源码编译路径已接入相同重打包步骤，但没有执行数小时全编译。
+- **状态：** 兼容候选已完成本地与 GitHub Actions 两次独立离线生成，压缩镜像 SHA-256 完全一致（`a09748b7f544de5d62b3b56cc6f6cfbe9ed103126c1dced6a6a93f946ec2c529`，624997688 字节）。Actions `41206370109` 全部成功，已发布 `bootchain-candidate-1` prerelease，并已转存至用户 MBA 下载目录、完整 SHA-256 复核通过。当前缺 TF 卡实物与覆盖确认；现有外接盘未操作。尚未上电验证；NPU/VPU 运行未验收。18 项合成 GPT 测试、ShellCheck、YAML 解析通过。完整源码编译路径已接入相同重打包步骤，但没有执行数小时全编译。
 - **改了：** `compat/inputs.json` 固定失败镜像及 Panther X2 引导文件；`scripts/graft_bootchain.py` 检查 GPT/校验值且只生成普通文件，拒绝设备、符号链接和覆盖；`scripts/build_bootchain_candidate.sh` 下载校验、打包与压缩；新增手动 Actions，原全编译也改为手动并应用同一引导替换；README 只写现状与实机边界。
 - **为什么·思路：** 用户确认 wlxxyw build 13 不启动，ophub `6.18.57_server_2026.10.17` 能启动。两份完整下载的压缩镜像 SHA-256 均与 GitHub release digest 一致。成功参照 `[32768,16777216)` 的全部字节等于固定 ophub/u-boot 提交的两份文件加零填充，整个区间 SHA-256 为 `2d61b73387e90d97e4401b48e5efe886b3d46702072878033d5d18680fb88c1e`。故先替换整段引导空隙，消除原引导与陈旧环境，保留 GPT/MBR 和全部文件系统字节不变，避免混用另一内核 DTB/模块。不能据此断定 DDR 批次问题，也不能保证旧 BL31 与 BSP DMC 的兼容性。
 - **证据：** 本地候选原始镜像 SHA-256 `4e7e4df5c44943eb88ece4339132bdfd4079abe098d445dd80f162546e06ac6b`，3015704576 字节；保护区前后 SHA-256 一致，报告明确 `hardware_boot_tested=false`、`npu_vpu_runtime_tested=false`。机器生成报告与大镜像不进 git，由 Actions artifact / prerelease 交付。
